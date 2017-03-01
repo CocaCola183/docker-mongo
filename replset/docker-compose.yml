@@ -1,0 +1,56 @@
+# deprecated network model
+# mongo1:
+#   image: mongo:3.3
+#   container_name: "mongo1"
+#   net: "bridge"
+#   ports:
+#     - "30001:27017"
+#   command: mongod --replSet mongoreplset
+# mongo2:
+#   image: mongo:3.3
+#   container_name: "mongo2"
+#   net: "bridge"
+#   ports:
+#     - "30002:27017"
+#   command: mongod --replSet mongoreplset
+# mongo3:
+#   image: mongo:3.3
+#   container_name: "mongo3"
+#   net: "bridge"
+#   ports:
+#     - "30003:27017"
+#   command: mongod --replSet mongoreplset
+# mongo-repl:
+#   image: mongo-replset-config
+#   container_name: mongo-repl
+#   net: "bridge"
+#   links:
+#     - mongo1:mongo1
+#     - mongo2:mongo2
+#     - mongo3:mongo3
+
+mongo1:
+  image: mongo:3.3
+  container_name: "mongo1"
+  net: "mongo-cluster"
+  ports:
+    - "30001:27017"
+  command: mongod --replSet mongoreplset
+mongo2:
+  image: mongo:3.3
+  container_name: "mongo2"
+  net: "mongo-cluster"
+  ports:
+    - "30002:27017"
+  command: mongod --replSet mongoreplset
+mongo3:
+  image: mongo:3.3
+  container_name: "mongo3"
+  net: "mongo-cluster"
+  ports:
+    - "30003:27017"
+  command: mongod --replSet mongoreplset
+mongo-repl:
+  image: mongo-replset-config
+  container_name: mongo-repl
+  net: "mongo-cluster"
