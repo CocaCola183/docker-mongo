@@ -1,0 +1,229 @@
+version: "2"
+services:
+  # 基于replset构建3个shard
+  mongo1-1:
+    image: mongo:3.3
+    container_name: "mongo1-1"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30010:27017"
+    command: mongod --replSet shard1
+  mongo1-2:
+    image: mongo:3.3
+    container_name: "mongo1-2"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30011:27017"
+    command: mongod --replSet shard1
+  mongo1-3:
+    image: mongo:3.3
+    container_name: "mongo1-3"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30012:27017"
+    command: mongod --replSet shard1
+  mongo-repl1:
+    image: mongo-replset
+    container_name: mongo-repl1
+    network_mode: "mongo-cluster"
+    depends_on: 
+      - "mongo1-1"
+      - "mongo1-2"
+      - "mongo1-3"
+    command: ./replset.sh -m mongo1-1:27017 -s mongo1-2:27017 -a mongo1-3:27017 -r shard1
+  mongo2-1:
+    image: mongo:3.3
+    container_name: "mongo2-1"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30013:27017"
+    command: mongod --replSet shard2
+  mongo2-2:
+    image: mongo:3.3
+    container_name: "mongo2-2"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30014:27017"
+    command: mongod --replSet shard2
+  mongo2-3:
+    image: mongo:3.3
+    container_name: "mongo2-3"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30015:27017"
+    command: mongod --replSet shard2
+  mongo-repl2:
+    image: mongo-replset
+    container_name: mongo-repl2
+    network_mode: "mongo-cluster"
+    depends_on: 
+      - "mongo2-1"
+      - "mongo2-2"
+      - "mongo2-3"
+    command: ./replset.sh -m mongo2-1:27017 -s mongo2-2:27017 -a mongo2-3:27017 -r shard2
+  mongo3-1:
+    image: mongo:3.3
+    container_name: "mongo3-1"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30016:27017"
+    command: mongod --replSet shard3
+  mongo3-2:
+    image: mongo:3.3
+    container_name: "mongo3-2"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30017:27017"
+    command: mongod --replSet shard3
+  mongo3-3:
+    image: mongo:3.3
+    container_name: "mongo3-3"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30018:27017"
+    command: mongod --replSet shard3
+  mongo-repl3:
+    image: mongo-replset
+    container_name: mongo-repl3
+    network_mode: "mongo-cluster"
+    depends_on: 
+      - "mongo3-1"
+      - "mongo3-2"
+      - "mongo3-3"
+    command: ./replset.sh -m mongo3-1:27017 -s mongo3-2:27017 -a mongo3-3:27017 -r shard3
+  # 构建config server副本集
+  mongo-config1:
+    image: mongo:3.3
+    container_name: "mongo-config1"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30001:27019"
+    command: mongod --configsvr --replSet config
+  mongo-config2:
+    image: mongo:3.3
+    container_name: "mongo-config2"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30002:27019"
+    command: mongod --configsvr --replSet config
+  mongo-config3:
+    image: mongo:3.3
+    container_name: "mongo-config3"
+    network_mode: "mongo-cluster"
+    ports:
+      - "30003:27019"
+    command: mongod --configsvr --replSet config
+  mongo-repl-config:
+    image: mongo-replset
+    container_name: mongo-repl-config
+    network_mode: "mongo-cluster"
+    depends_on: 
+      - "mongo-config1"
+      - "mongo-config2"
+      - "mongo-config3"
+    command: ./replset.sh -m mongo-config1:27019 -s mongo-config2:27019,mongo-config3:27019 -r config
+  # 启动3个mongos1
+  mongos1:
+    image: mongo:3.3
+    container_name: "mongos1"
+    network_mode: "mongo-cluster"
+    depends_on: 
+      - "mongo-repl-config"
+      - "mongo-repl1"
+      - "mongo-repl2"
+      - "mongo-repl3"
+    ports:
+      - "30004:27017"
+    command: mongos --configdb config/mongo-config1:27019,mongo-config2:27019,mongo-config3:27019
+  mongo-shard-config1:
+    image: mongo-shard
+    container_name: mongo-shard-config1
+    network_mode: "mongo-cluster"
+    depends_on: 
+      - "mongos1"
+    command: ./shard.sh -a mongos1:27017 -r shard1/mongo1-1:27017,mongo1-2:27017,mongo1-3:27017|shard2/mongo2-1:27017,mongo2-2:27017,mongo2-3:27017|shard3/mongo3-1:27017,mongo3-2:27017,mongo3-3:27017 -d local -t user -k _id
+  mongos2:
+    image: mongo:3.3
+    container_name: "mongos2"
+    network_mode: "mongo-cluster"
+    depends_on: 
+      - "mongo-repl-config"
+      - "mongo-repl1"
+      - "mongo-repl2"
+      - "mongo-repl3"
+    ports:
+      - "30005:27017"
+    command: mongos --configdb config/mongo-config1:27019,mongo-config2:27019,mongo-config3:27019
+  mongo-shard-config2:
+    image: mongo-shard
+    container_name: mongo-shard-config2
+    network_mode: "mongo-cluster"
+    depends_on: 
+      - "mongos2"
+      - "mongo-shard-config1"
+    command: ./shard.sh -a mongos2:27017 -r shard1/mongo1-1:27017,mongo1-2:27017,mongo1-3:27017|shard2/mongo2-1:27017,mongo2-2:27017,mongo2-3:27017|shard3/mongo3-1:27017,mongo3-2:27017,mongo3-3:27017 -d local -t user -k _id
+  mongos3:
+    image: mongo:3.3
+    container_name: "mongos3"
+    network_mode: "mongo-cluster"
+    depends_on: 
+      - "mongo-repl-config"
+      - "mongo-repl1"
+      - "mongo-repl2"
+      - "mongo-repl3"
+    ports:
+      - "30006:27017"
+    command: mongos --configdb config/mongo-config1:27019,mongo-config2:27019,mongo-config3:27019
+  mongo-shard-config3:
+    image: mongo-shard
+    container_name: mongo-shard-config3
+    network_mode: "mongo-cluster"
+    depends_on: 
+      - "mongos3"
+      - "mongo-shard-config1"
+      - "mongo-shard-config2"
+    command: ./shard.sh -a mongos3:27017 -r shard1/mongo1-1:27017,mongo1-2:27017,mongo1-3:27017|shard2/mongo2-1:27017,mongo2-2:27017,mongo2-3:27017|shard3/mongo3-1:27017,mongo3-2:27017,mongo3-3:27017 -d local -t user -k _id
+
+# mongos12:
+#   image: mongo:3.3
+#   container_name: "mongos12"
+#   network_mode: "mongo-cluster"
+#   ports:
+#     - "30005:27017"
+#   command: mongos1 --configdb mongo-config1,mongo-config2,mongo-config3 --fork
+# mongos13:
+#   image: mongo:3.3
+#   container_name: "mongos13"
+#   network_mode: "mongo-cluster"
+#   ports:
+#     - "30006:27017"
+#   command: mongos1 --configdb mongo-config1,mongo-config2,mongo-config3 --fork
+  # mongo-shard1:
+  #   image: mongo:3.3
+  #   container_name: "mongo-shard1"
+  #   network_mode: "mongo-cluster"
+  #   ports:
+  #     - "30007:27017"
+  #   command: mongod --shardsvr --replSet shard1 --fork --nojournal --oplogSize 10
+# mongo-shard2:
+#   image: mongo:3.3
+#   container_name: "mongo-shard2"
+#   network_mode: "mongo-cluster"
+#   ports:
+#     - "30008:27017"
+#   command: mongod --shardsvr --replSet shard2 --fork --nojournal --oplogSize 10
+# mongo-shard3:
+#   image: mongo:3.3
+#   container_name: "mongo-shard3"
+#   network_mode: "mongo-cluster"
+#   ports:
+#     - "30009:27017"
+#   command: mongod --shardsvr --replSet shard3 --fork --nojournal --oplogSize 10
+
+
+
+
+
+
+    
+# command: mongod --shardsvr --replSet shard1 --fork --nojournal --oplogSize 10
